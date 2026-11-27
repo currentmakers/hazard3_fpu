@@ -38,7 +38,7 @@ example_soc #(
 	.SRAM_DEPTH          (1 << 14),
 	.CLK_MHZ             (35),
 
-	// Baseline: RV32IMAC + Zicsr + Zifencei, the "before FPU" reference.
+	// RV32IMAC + Zicsr + Zifencei + Zfinx (single-precision FPU)
 	.EXTENSION_M         (1),
 	.EXTENSION_A         (1),
 	.EXTENSION_C         (1),
@@ -48,6 +48,7 @@ example_soc #(
 	.EXTENSION_ZBS       (0),
 	.EXTENSION_ZBKB      (0),
 	.EXTENSION_ZIFENCEI  (1),
+	.EXTENSION_ZFINX     (1),
 	.EXTENSION_XH3BEXTM  (0),
 	.EXTENSION_XH3PMPM   (0),
 	.EXTENSION_XH3POWER  (0),

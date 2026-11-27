@@ -1,7 +1,7 @@
 [submodule "hazard3"]
 	path = hazard3
-	url = https://github.com/Wren6991/Hazard3.git
-	branch = stable
+	url = https://github.com/currentmakers/Hazard3.git
+	branch = fpu
 [submodule "third_party/berkeley-softfloat-3"]
 	path = third_party/berkeley-softfloat-3
 	url = https://github.com/ucb-bar/berkeley-softfloat-3.git

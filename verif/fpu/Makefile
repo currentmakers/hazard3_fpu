@@ -12,7 +12,7 @@ SHELL  := /bin/bash
 ROOT   := $(abspath ../..)
 SF     := $(ROOT)/third_party/berkeley-softfloat-3
 TF     := $(ROOT)/third_party/berkeley-testfloat-3
-RTL    := $(ROOT)/rtl/fpu
+RTL    := $(ROOT)/hazard3/hdl/fpu
 B      := $(abspath build)
 
 N      ?= 1000000

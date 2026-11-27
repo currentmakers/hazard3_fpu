@@ -23,6 +23,7 @@ example_soc #(
 	.EXTENSION_A         (1),
 	.EXTENSION_C         (1),
 	.EXTENSION_ZIFENCEI  (1),
+	.EXTENSION_ZFINX     (1),
 	.CSR_COUNTER         (1),
 	.MUL_FAST            (1),
 	.MULDIV_UNROLL       (1),

@@ -1,11 +1,11 @@
 # Common build rules for bare-metal apps on the Hazard3 example SoC.
 # Usage (in an app Makefile):  APP = name; SRCS = main.c; include ../common/app.mk
 #
-# ARCH=rv32imac_zicsr_zifencei       (default, soft-float)
-# ARCH=rv32imac_zicsr_zifencei_zfinx (once the core has the Zfinx FPU)
+# ARCH=rv32imac_zicsr_zifencei_zfinx (default: hardware FP32 in integer regs)
+# ARCH=rv32imac_zicsr_zifencei       (soft-float, for a core without the FPU)
 
 CROSS_PREFIX ?= riscv64-unknown-elf-
-ARCH         ?= rv32imac_zicsr_zifencei
+ARCH         ?= rv32imac_zicsr_zifencei_zfinx
 ABI          ?= ilp32
 CLK_HZ       ?= 35000000
 
