@@ -1,0 +1,17 @@
+# Colorlight i5 (v7.0) pin constraints.
+# Pins taken from the LiteX colorlight_i5 board definition -- verify against
+# your module revision / extension board before trusting the UART pins.
+
+LOCATE COMP "clk_osc" SITE "P3";
+IOBUF  PORT "clk_osc" IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk_osc" 25 MHZ;
+
+# User LED on the i5 module (active low)
+LOCATE COMP "led_n" SITE "U16";
+IOBUF  PORT "led_n" IO_TYPE=LVCMOS33 DRIVE=4;
+
+# UART, routed to the USB-serial on the i5 extension board
+LOCATE COMP "uart_tx" SITE "J17"; # FPGA -> host
+LOCATE COMP "uart_rx" SITE "H18"; # host -> FPGA
+IOBUF  PORT "uart_tx" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "uart_rx" PULLMODE=UP IO_TYPE=LVCMOS33;

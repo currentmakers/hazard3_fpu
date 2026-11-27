@@ -1,0 +1,6 @@
+*.json
+*.config
+*.bit
+*.svf
+*.log
+*_synth.v
