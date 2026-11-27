@@ -8,6 +8,9 @@
 | `fpga/colorlight_i5/`  | Bitstream build for Colorlight i5 (LFE5U-25F), 35 MHz        |
 | `sw/`                  | Bare-metal software: `common/` (crt0, linker script, UART), apps |
 | `sim/soc/`             | Verilator sim of the whole SoC, decodes UART output           |
+| `rtl/fpu/`             | FP32 FPU (RV32F/Zfinx ops), standalone, see its README        |
+| `verif/fpu/`           | FPU testbench vs SoftFloat; `make test`, `make testfloat`     |
+| `third_party/`         | Berkeley SoftFloat 3 / TestFloat 3 (BSD-3) submodules         |
 
 Toolchain: Debian `gcc-riscv64-unknown-elf` (builds RV32 with
 `-march=rv32... -mabi=ilp32`), picolibc, Yosys, nextpnr-ecp5, Verilator,

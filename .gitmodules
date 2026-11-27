@@ -2,3 +2,9 @@
 	path = hazard3
 	url = https://github.com/Wren6991/Hazard3.git
 	branch = stable
+[submodule "third_party/berkeley-softfloat-3"]
+	path = third_party/berkeley-softfloat-3
+	url = https://github.com/ucb-bar/berkeley-softfloat-3.git
+[submodule "third_party/berkeley-testfloat-3"]
+	path = third_party/berkeley-testfloat-3
+	url = https://github.com/ucb-bar/berkeley-testfloat-3.git
