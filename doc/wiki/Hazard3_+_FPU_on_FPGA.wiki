@@ -45,23 +45,15 @@ The price is register pressure (floats and integers share 31 registers) and bina
 
 Hazard3 is a 3-stage pipeline (fetch, execute, memory/writeback) with optional extensions selected by Verilog parameters. Multiply and divide run in a sequential unit, <code>hazard3_muldiv_seq</code>, that sits in the execute stage (X) and stalls the pipeline until it has a result. The FPU uses exactly the same pattern, so it slots into the core next to the multiplier with few changes to the pipeline.
 
-<pre>
-              +-------------------- Hazard3 core ---------------------+
-              |                                                       |
-  AHB-Lite    |   F            X                         M            |
-  <--------->-+-> fetch --> decode/regs --+--> ALU --+--> load/store  |
-  64 kB SRAM  |                           |          |    writeback   |
-              |                           +--> MUL/DIV (sequential)    |
-              |                           |          |                |
-              |                           +--> FPU  -+  (sequential,  |
-              |                                          new)         |
-              |   CSRs: fflags, frm, fcsr (new)                       |
-              +-------------------------------------------------------+
-</pre>
+[[File:Hazard3_FPU_SoC_architecture.svg|thumb|center|960px|The SoC on the Colorlight i5: Hazard3 with the FPU, debug path, bus, memory and peripherals. Orange: added by this project.]]
+
+The orange parts are what this project adds. Everything else is Hazard3's example SoC, unchanged apart from the boot program in the SRAM.
 
 === The FPU ===
 
 The FPU computes one operation at a time over several cycles. It has the same valid/ready/kill handshake as the multiply/divide unit: the core starts an operation, can abandon it (when an interrupt or exception arrives), and stalls until the result is valid.
+
+[[File:Hazard3_FPU_datapath.svg|thumb|center|960px|How each class of operation flows through the FPU. Every result that has to be rounded goes through the same normalise and round stages.]]
 
 {| class="wikitable"
 ! File !! Purpose

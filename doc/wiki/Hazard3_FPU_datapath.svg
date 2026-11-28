@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 960 450" font-family="DejaVu Sans, Arial, Helvetica, sans-serif" font-size="13">
+  <title>Hazard3 Zfinx FPU: datapath and operation flow</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <style>
+      .box  { fill: #f4f6f8; stroke: #5b6670; stroke-width: 1.3; }
+      .fma  { fill: #fde4cc; stroke: #d2691e; stroke-width: 1.6; }
+      .shr  { fill: #fbd3ad; stroke: #b4560f; stroke-width: 2; }
+      .io   { fill: #e8eef7; stroke: #4a6a9a; stroke-width: 1.3; }
+      .ln   { stroke: #444; stroke-width: 1.5; fill: none; }
+      .t    { fill: #1d2329; text-anchor: middle; }
+      .s    { fill: #4a535c; text-anchor: middle; font-size: 11px; }
+      .c    { fill: #b4560f; text-anchor: middle; font-size: 10px; font-weight: bold; }
+      .lbl  { fill: #4a535c; font-size: 11px; }
+      .h    { fill: #1d2329; font-weight: bold; font-size: 14px; }
+    </style>
+  </defs>
+
+  <text class="h" x="20" y="24">Zfinx FPU: one operation at a time, same handshake as the MUL/DIV unit</text>
+
+  <!-- Inputs -->
+  <rect class="io" x="20" y="50" width="90" height="380" rx="6"/>
+  <text class="t" x="65" y="74" font-weight="bold">From X</text>
+  <text class="s" x="65" y="104">op_a = rs1</text>
+  <text class="s" x="65" y="122">op_b = rs2</text>
+  <text class="s" x="65" y="140">op_c = rs3</text>
+  <text class="s" x="65" y="170">op</text>
+  <text class="s" x="65" y="188">rm</text>
+  <text class="s" x="65" y="218">op_vld</text>
+  <text class="s" x="65" y="236">op_kill</text>
+  <text class="s" x="65" y="266">(integer</text>
+  <text class="s" x="65" y="280">registers)</text>
+
+  <path class="ln" d="M110,240 H130" marker-end="url(#a)"/>
+
+  <!-- Unpack -->
+  <rect class="box" x="130" y="50" width="135" height="380" rx="6"/>
+  <text class="t" x="197" y="74" font-weight="bold">Unpack</text>
+  <text class="c" x="197" y="90">cycle 1</text>
+  <text class="s" x="197" y="116">operand mapping:</text>
+  <text class="s" x="197" y="132">FADD → a × 1.0 + b</text>
+  <text class="s" x="197" y="148">FMUL → a × b + ±0</text>
+  <text class="s" x="197" y="164">FSUB, FN* → signs</text>
+  <text class="s" x="197" y="194">3 × classify:</text>
+  <text class="s" x="197" y="210">zero, subnormal,</text>
+  <text class="s" x="197" y="226">normal, inf, NaN</text>
+  <text class="s" x="197" y="256">subnormals</text>
+  <text class="s" x="197" y="272">normalised</text>
+  <text class="s" x="197" y="302">choose path</text>
+
+  <!-- Row: special / simple ops -->
+  <rect class="box" x="300" y="50" width="555" height="46" rx="5"/>
+  <text class="t" x="577" y="70">NaN / inf / zero operands, sign-inject, min/max, compare, classify</text>
+  <text class="s" x="577" y="87">answered directly: 1 cycle</text>
+  <path class="ln" d="M265,73 H300" marker-end="url(#a)"/>
+  <path class="ln" d="M855,73 H880" marker-end="url(#a)"/>
+
+  <!-- Row: FMA pipeline -->
+  <path class="ln" d="M265,147 H300" marker-end="url(#a)"/>
+  <rect class="fma" x="300" y="118" width="100" height="58" rx="5"/>
+  <text class="t" x="350" y="140">Multiply</text>
+  <text class="s" x="350" y="155">24 × 24 bit</text>
+  <text class="s" x="350" y="168">4 DSP blocks</text>
+  <text class="c" x="350" y="112">cycle 2</text>
+  <path class="ln" d="M400,147 H413" marker-end="url(#a)"/>
+
+  <rect class="fma" x="413" y="118" width="100" height="58" rx="5"/>
+  <text class="t" x="463" y="140">Align</text>
+  <text class="s" x="463" y="155">shift addend,</text>
+  <text class="s" x="463" y="168">sticky bit</text>
+  <text class="c" x="463" y="112">cycle 3</text>
+  <path class="ln" d="M513,147 H526" marker-end="url(#a)"/>
+
+  <rect class="fma" x="526" y="118" width="100" height="58" rx="5"/>
+  <text class="t" x="576" y="140">Add</text>
+  <text class="s" x="576" y="155">significands,</text>
+  <text class="s" x="576" y="168">result sign</text>
+  <text class="c" x="576" y="112">cycle 4</text>
+  <path class="ln" d="M626,147 H639" marker-end="url(#a)"/>
+
+  <rect class="shr" x="639" y="118" width="100" height="58" rx="5"/>
+  <text class="t" x="689" y="140">Normalise</text>
+  <text class="s" x="689" y="155">leading-zero</text>
+  <text class="s" x="689" y="168">count + shift</text>
+  <text class="c" x="689" y="112">cycle 5</text>
+  <path class="ln" d="M739,147 H752" marker-end="url(#a)"/>
+
+  <rect class="shr" x="752" y="118" width="103" height="58" rx="5"/>
+  <text class="t" x="803" y="140">Round + pack</text>
+  <text class="s" x="803" y="155">all 5 modes,</text>
+  <text class="s" x="803" y="168">OF / UF / NX</text>
+  <text class="c" x="803" y="112">cycle 6</text>
+  <path class="ln" d="M855,147 H880" marker-end="url(#a)"/>
+
+  <text class="lbl" x="302" y="194">add, sub, mul and all FMA ops share this path: 6 cycles</text>
+
+  <!-- Row: int to float -->
+  <path class="ln" d="M265,233 H300" marker-end="url(#a)"/>
+  <rect class="box" x="300" y="210" width="326" height="46" rx="5"/>
+  <text class="t" x="463" y="230">Integer → float (FCVT.S.W, FCVT.S.WU)</text>
+  <text class="s" x="463" y="247">abs value, then normalise and round: 3 cycles</text>
+  <path class="ln" d="M626,233 H689 V176" marker-end="url(#a)"/>
+
+  <!-- Row: div / sqrt -->
+  <path class="ln" d="M265,297 H300" marker-end="url(#a)"/>
+  <rect class="box" x="300" y="274" width="326" height="46" rx="5"/>
+  <text class="t" x="463" y="294">Divide, square root</text>
+  <text class="s" x="463" y="311">radix-2, one bit per cycle: 27 cycles</text>
+  <path class="ln" d="M626,297 H803 V176" marker-end="url(#a)"/>
+
+  <!-- Row: float to int -->
+  <path class="ln" d="M265,361 H300" marker-end="url(#a)"/>
+  <rect class="box" x="300" y="338" width="555" height="46" rx="5"/>
+  <text class="t" x="577" y="358">Float → integer (FCVT.W.S, FCVT.WU.S)</text>
+  <text class="s" x="577" y="375">shift, round with rm, saturate + NV on overflow or NaN: 2 cycles</text>
+  <path class="ln" d="M855,361 H880" marker-end="url(#a)"/>
+
+  <!-- Output -->
+  <rect class="io" x="880" y="50" width="65" height="334" rx="6"/>
+  <text class="t" x="912" y="74" font-weight="bold">To X</text>
+  <text class="s" x="912" y="104">result</text>
+  <text class="s" x="912" y="122">fflags</text>
+  <text class="s" x="912" y="140">(NV DZ</text>
+  <text class="s" x="912" y="154">OF UF</text>
+  <text class="s" x="912" y="168">NX)</text>
+  <text class="s" x="912" y="198">result_vld</text>
+
+  <!-- Legend -->
+  <rect class="fma" x="300" y="404" width="18" height="14" rx="2"/>
+  <text class="lbl" x="325" y="416">fused multiply-add path</text>
+  <rect class="shr" x="480" y="404" width="18" height="14" rx="2"/>
+  <text class="lbl" x="505" y="416">shared by every operation that produces a rounded float</text>
+</svg>

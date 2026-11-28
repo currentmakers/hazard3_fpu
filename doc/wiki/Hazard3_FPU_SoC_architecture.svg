@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" font-family="DejaVu Sans, Arial, Helvetica, sans-serif" font-size="13">
+  <title>Hazard3 with Zfinx FPU on the Colorlight i5: SoC architecture</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <style>
+      .box  { fill: #f4f6f8; stroke: #5b6670; stroke-width: 1.3; }
+      .blk  { fill: #ffffff; stroke: #5b6670; stroke-width: 1.2; }
+      .new  { fill: #fde4cc; stroke: #d2691e; stroke-width: 1.8; }
+      .ext  { fill: #e8eef7; stroke: #4a6a9a; stroke-width: 1.3; }
+      .ln   { stroke: #444; stroke-width: 1.5; fill: none; }
+      .dash { stroke: #444; stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; }
+      .t    { fill: #1d2329; text-anchor: middle; }
+      .s    { fill: #4a535c; text-anchor: middle; font-size: 11px; }
+      .h    { fill: #1d2329; font-weight: bold; font-size: 14px; }
+      .lbl  { fill: #4a535c; font-size: 11px; }
+    </style>
+  </defs>
+
+  <!-- Off-chip -->
+  <rect class="ext" x="20" y="60" width="150" height="54" rx="6"/>
+  <text class="t" x="95" y="84">PC</text>
+  <text class="s" x="95" y="101">OpenOCD, GDB, terminal</text>
+
+  <rect class="ext" x="20" y="200" width="150" height="62" rx="6"/>
+  <text class="t" x="95" y="224">STM32 DAPLink</text>
+  <text class="s" x="95" y="241">CMSIS-DAP (JTAG)</text>
+  <text class="s" x="95" y="255">+ USB serial</text>
+
+  <path class="ln" d="M95,114 V200" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="lbl" x="102" y="160">USB</text>
+
+  <!-- FPGA -->
+  <rect x="200" y="20" width="740" height="580" rx="10" fill="none" stroke="#2f3b46" stroke-width="2"/>
+  <text class="h" x="216" y="44">Lattice ECP5 LFE5U-25F (Colorlight i5)</text>
+
+  <!-- Debug path -->
+  <rect class="box" x="225" y="200" width="160" height="62" rx="5"/>
+  <text class="t" x="305" y="224">JTAGG + DTM</text>
+  <text class="s" x="305" y="241">ECP5 chip TAP,</text>
+  <text class="s" x="305" y="255">user IR ER1 / ER2</text>
+  <path class="ln" d="M170,231 H225" marker-start="url(#a)" marker-end="url(#a)"/>
+
+  <rect class="box" x="225" y="296" width="160" height="62" rx="5"/>
+  <text class="t" x="305" y="320">Debug Module</text>
+  <text class="s" x="305" y="337">halt, step, registers,</text>
+  <text class="s" x="305" y="351">memory via prog. buffer</text>
+  <path class="ln" d="M305,262 V296" marker-end="url(#a)"/>
+  <text class="lbl" x="311" y="284">DMI</text>
+  <path class="ln" d="M385,320 H420" marker-start="url(#a)" marker-end="url(#a)"/>
+
+  <rect class="box" x="225" y="530" width="160" height="50" rx="5"/>
+  <text class="t" x="305" y="551">PLL</text>
+  <text class="s" x="305" y="568">25 MHz → 35 MHz clk_sys</text>
+
+  <!-- Core -->
+  <rect class="box" x="420" y="60" width="500" height="290" rx="8"/>
+  <text class="h" x="434" y="82">Hazard3 core: RV32IMAC + Zicsr + Zifencei + Zfinx</text>
+
+  <text class="s" x="490" y="104" font-weight="bold">F (fetch)</text>
+  <text class="s" x="665" y="104" font-weight="bold">X (execute)</text>
+  <text class="s" x="855" y="104" font-weight="bold">M (memory)</text>
+  <line x1="555" y1="94" x2="555" y2="340" stroke="#9aa4ad" stroke-dasharray="3 3"/>
+  <line x1="785" y1="94" x2="785" y2="340" stroke="#9aa4ad" stroke-dasharray="3 3"/>
+
+  <rect class="blk" x="432" y="114" width="114" height="60" rx="4"/>
+  <text class="t" x="489" y="137">Fetch</text>
+  <text class="s" x="489" y="153">branch predictor,</text>
+  <text class="s" x="489" y="166">compressed (C)</text>
+
+  <rect class="blk" x="566" y="114" width="98" height="40" rx="4"/>
+  <text class="t" x="615" y="132">Decode</text>
+  <rect class="new" x="566" y="140" width="98" height="14" rx="0" fill-opacity="0.6" stroke="none"/>
+  <text class="s" x="615" y="151">+ Zfinx decode</text>
+
+  <rect class="blk" x="674" y="114" width="102" height="40" rx="4"/>
+  <text class="t" x="725" y="132">x0-x31</text>
+  <text class="s" x="725" y="146">2 read ports</text>
+
+  <rect class="blk" x="566" y="166" width="210" height="34" rx="4"/>
+  <text class="t" x="671" y="188">ALU, branch compare</text>
+
+  <rect class="blk" x="566" y="210" width="210" height="34" rx="4"/>
+  <text class="t" x="671" y="226">MUL / DIV</text>
+  <text class="s" x="671" y="239">sequential, stalls X</text>
+
+  <rect class="new" x="566" y="254" width="210" height="50" rx="4"/>
+  <text class="t" x="671" y="273" font-weight="bold">FPU (FP32, Zfinx)</text>
+  <text class="s" x="671" y="288">sequential like MUL/DIV, stalls X;</text>
+  <text class="s" x="671" y="300">FMA: extra X cycle reads rs3</text>
+
+  <rect class="blk" x="796" y="114" width="114" height="60" rx="4"/>
+  <text class="t" x="853" y="137">Load / store</text>
+  <text class="s" x="853" y="153">AMO (A),</text>
+  <text class="s" x="853" y="166">writeback</text>
+
+  <rect class="blk" x="796" y="210" width="114" height="94" rx="4"/>
+  <text class="t" x="853" y="232">CSRs</text>
+  <text class="s" x="853" y="248">trap, counters,</text>
+  <text class="s" x="853" y="262">debug</text>
+  <rect class="new" x="802" y="272" width="102" height="26" rx="3"/>
+  <text class="s" x="853" y="289">fflags, frm, fcsr</text>
+
+  <!-- Bus -->
+  <path class="ln" d="M670,350 V380" marker-end="url(#a)"/>
+  <text class="lbl" x="678" y="370">AHB-Lite, one port (instructions + data)</text>
+
+  <rect class="box" x="560" y="380" width="220" height="36" rx="5"/>
+  <text class="t" x="670" y="403">AHB-Lite splitter</text>
+
+  <path class="ln" d="M610,416 V440 H520 V460" marker-end="url(#a)"/>
+  <path class="ln" d="M730,416 V440 H810 V460" marker-end="url(#a)"/>
+  <text class="lbl" x="530" y="452">0x0000_0000</text>
+  <text class="lbl" x="817" y="454">0x4000_0000</text>
+
+  <rect class="box" x="425" y="460" width="190" height="70" rx="5"/>
+  <text class="t" x="520" y="484">SRAM 64 kB</text>
+  <text class="s" x="520" y="500">32 block RAMs, code + data</text>
+  <rect class="new" x="440" y="507" width="160" height="17" rx="3"/>
+  <text class="s" x="520" y="520">boot program in bitstream</text>
+
+  <rect class="box" x="720" y="460" width="180" height="36" rx="5"/>
+  <text class="t" x="810" y="483">AHB → APB bridge</text>
+
+  <path class="ln" d="M770,496 V520" marker-end="url(#a)"/>
+  <path class="ln" d="M850,496 V520" marker-end="url(#a)"/>
+
+  <rect class="box" x="705" y="520" width="100" height="50" rx="5"/>
+  <text class="t" x="755" y="541">Timer</text>
+  <text class="s" x="755" y="558">0x4000_0000</text>
+
+  <rect class="box" x="815" y="520" width="100" height="50" rx="5"/>
+  <text class="t" x="865" y="541">UART</text>
+  <text class="s" x="865" y="558">0x4000_4000</text>
+
+  <!-- Interrupts -->
+  <path class="dash" d="M915,545 H926 V330 H920" marker-end="url(#a)"/>
+  <text class="lbl" text-anchor="middle" transform="translate(937,440) rotate(-90)">IRQ</text>
+
+  <!-- UART to DAPLink -->
+  <path class="ln" d="M865,570 V588 H60 V262" marker-end="url(#a)"/>
+  <text class="lbl" x="66" y="430">UART</text>
+  <text class="lbl" x="66" y="444">115200</text>
+  <text class="lbl" x="66" y="458">(J17 / H18)</text>
+
+  <!-- Legend -->
+  <rect class="new" x="225" y="420" width="18" height="14" rx="2"/>
+  <text class="lbl" x="250" y="432">added by this project</text>
+  <text class="lbl" x="225" y="456">35 MHz, 9864 LUT4 (41%)</text>
+  <text class="lbl" x="225" y="472">FPU ≈ 3500 LUT4, 4 DSP</text>
+</svg>
