@@ -8,12 +8,14 @@ CROSS_PREFIX ?= riscv64-unknown-elf-
 ARCH         ?= rv32imac_zicsr_zifencei_zfinx
 ABI          ?= ilp32
 CLK_HZ       ?= 35000000
+OPT          ?= -Os
+# Also available: EXTRA_CFLAGS, EXTRA_DEPS (extra prerequisites of the ELF)
 
 COMMON  := $(dir $(lastword $(MAKEFILE_LIST)))
 BUILD   ?= build
 
-CFLAGS  += -march=$(ARCH) -mabi=$(ABI) -Os -g -Wall -Wextra \
-           -ffreestanding -fno-builtin -I$(COMMON) -DCLK_HZ=$(CLK_HZ)u
+CFLAGS  += -march=$(ARCH) -mabi=$(ABI) $(OPT) -g -Wall -Wextra \
+           -ffreestanding -fno-builtin -I$(COMMON) -DCLK_HZ=$(CLK_HZ)u $(EXTRA_CFLAGS)
 LDFLAGS += -nostartfiles -nostdlib -T $(COMMON)soc.ld -Wl,--gc-sections \
            -Wl,--no-warn-rwx-segments -Wl,-Map=$(BUILD)/$(APP).map
 LIBS    += -lgcc
@@ -23,7 +25,7 @@ OPENOCD_CFG ?= $(COMMON)../../fpga/colorlight_i5/openocd-colorlight-i5.cfg
 .PHONY: all clean load
 all: $(BUILD)/$(APP).elf $(BUILD)/$(APP).bin $(BUILD)/$(APP).dis
 
-$(BUILD)/$(APP).elf: $(COMMON)crt0.S $(SRCS) $(wildcard $(COMMON)*.h) $(COMMON)soc.ld $(COMMON)app.mk Makefile
+$(BUILD)/$(APP).elf: $(COMMON)crt0.S $(SRCS) $(wildcard $(COMMON)*.h) $(COMMON)soc.ld $(COMMON)app.mk Makefile $(EXTRA_DEPS)
 	@mkdir -p $(BUILD)
 	$(CROSS_PREFIX)gcc $(CFLAGS) $(LDFLAGS) $(COMMON)crt0.S $(SRCS) $(LIBS) -o $@
 	$(CROSS_PREFIX)size $@
