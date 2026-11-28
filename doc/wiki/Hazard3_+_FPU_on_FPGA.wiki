@@ -1,0 +1,269 @@
+[[Category:FPGA]][[Category:RISC-V]]{{metadesc|Hazard3 RISC-V core with a home-made single-precision Zfinx FPU on a Colorlight i5 (Lattice ECP5) FPGA: architecture, verification, resource use and benchmarks}}
+[https://github.com/Wren6991/Hazard3 Hazard3] is a small, open source RV32 RISC-V core written by Luke Wren, best known as one of the two core types inside the RP2350. It has no floating point unit. This project adds one: a single-precision FPU written from scratch, implementing the RISC-V '''Zfinx''' extension, and runs the result on a cheap '''Colorlight i5''' module (Lattice ECP5 LFE5U-25F) at 35 MHz, built entirely with the open source FPGA tools.
+
+The FPU is fully IEEE 754 compliant (all rounding modes, subnormals, exception flags) and is checked bit for bit against Berkeley SoftFloat on about 200 million test vectors. On the board, single-precision Whetstone runs '''7.9 times faster''' with the FPU than with software floating point.
+
+* Project repository: [https://github.com/currentmakers/hazard3_fpu currentmakers/hazard3_fpu] (FPGA build, software, simulation, verification)
+* Hazard3 fork with the FPU: [https://github.com/currentmakers/Hazard3/tree/fpu currentmakers/Hazard3, branch fpu]
+* Upstream Hazard3: [https://github.com/Wren6991/Hazard3 Wren6991/Hazard3] (Apache-2.0)
+
+== Overview ==
+
+{| class="wikitable"
+! Item !! Value
+|-
+| FPGA || Lattice ECP5 LFE5U-25F-6BG381C on a Colorlight i5 module
+|-
+| Core || Hazard3, RV32IMAC + Zicsr + Zifencei + '''Zfinx'''
+|-
+| Clock || 35 MHz (25 MHz oscillator, PLL)
+|-
+| Memory || 64 kB SRAM in block RAM, code and data
+|-
+| Peripherals || UART (115200 baud), RISC-V machine timer, LED
+|-
+| Debug || RISC-V debug over JTAG, through the ECP5's own JTAG port
+|-
+| Logic used || 9864 of 24288 LUT4 (41%), of which the FPU is about 3500
+|-
+| Tools || Yosys, nextpnr-ecp5, Project Trellis, Verilator, openFPGALoader, OpenOCD, GCC
+|}
+
+== Why Zfinx ==
+
+The usual RISC-V floating point extension, F, adds 32 separate floating point registers, load/store instructions for them, and a status field in <code>mstatus</code> that the OS uses to decide when FP registers need saving. '''Zfinx''' ("F in X") has the same computational instructions but keeps floats in the normal integer registers:
+
+* no second register file: a 32 x 32 bit register file with its read ports and bypass network would be a large part of this small core
+* no FP load/store or move instructions: floats are loaded and stored with <code>lw</code>/<code>sw</code>
+* nothing extra to save on an interrupt or context switch
+
+The price is register pressure (floats and integers share 31 registers) and binary incompatibility with F code. For a small embedded core that's a good trade. GCC supports it directly: <code>-march=rv32imac_zicsr_zifencei_zfinx -mabi=ilp32</code>.
+
+== Architecture ==
+
+=== Hazard3 ===
+
+Hazard3 is a 3-stage pipeline (fetch, execute, memory/writeback) with optional extensions selected by Verilog parameters. Multiply and divide run in a sequential unit, <code>hazard3_muldiv_seq</code>, that sits in the execute stage (X) and stalls the pipeline until it has a result. The FPU uses exactly the same pattern, so it slots into the core next to the multiplier with few changes to the pipeline.
+
+<pre>
+              +-------------------- Hazard3 core ---------------------+
+              |                                                       |
+  AHB-Lite    |   F            X                         M            |
+  <--------->-+-> fetch --> decode/regs --+--> ALU --+--> load/store  |
+  64 kB SRAM  |                           |          |    writeback   |
+              |                           +--> MUL/DIV (sequential)    |
+              |                           |          |                |
+              |                           +--> FPU  -+  (sequential,  |
+              |                                          new)         |
+              |   CSRs: fflags, frm, fcsr (new)                       |
+              +-------------------------------------------------------+
+</pre>
+
+=== The FPU ===
+
+The FPU computes one operation at a time over several cycles. It has the same valid/ready/kill handshake as the multiply/divide unit: the core starts an operation, can abandon it (when an interrupt or exception arrives), and stalls until the result is valid.
+
+{| class="wikitable"
+! File !! Purpose
+|-
+| <code>hazard3_fpu.v</code> || State machine, fused multiply-add datapath, divide/square root, conversions, compares
+|-
+| <code>hazard3_fpu_unpack.v</code> || Classify operands (zero, subnormal, inf, NaN), normalise subnormals
+|-
+| <code>hazard3_fpu_norm.v</code> || Leading-zero count and normalising shift
+|-
+| <code>hazard3_fpu_round.v</code> || Shared round-and-pack: all five rounding modes, overflow, gradual underflow
+|-
+| <code>hazard3_fpu_ops.vh</code> || Operation, rounding mode and flag encodings
+|}
+
+Main design choices:
+
+* '''One FMA datapath for add, multiply and FMA.''' FADD is computed as <code>a × 1.0 + b</code> and FMUL as <code>a × b + (±0)</code>. That makes add and multiply exactly as expensive as a fused multiply-add, but means there's only one wide adder, one normaliser and one rounder in the design. The 24 × 24 bit multiply uses four of the ECP5's 18 × 18 multiplier blocks.
+* '''Divide and square root''' use a radix-2 digit recurrence, one bit per cycle. Slow (27 cycles), but small.
+* '''One rounding unit''' shared by every operation that produces a float, so the subtle cases (rounding into a subnormal, rounding up to infinity, tininess detected after rounding as RISC-V requires) are handled in one place.
+* '''Special cases first.''' If an operand is NaN, infinity or zero and that decides the result, the FPU answers in one cycle.
+
+==== Latency ====
+
+Latency in FPU cycles after the operation is accepted, and the cost seen by software including issue:
+
+{| class="wikitable" style="text-align:center"
+! Operations !! FPU latency !! Cycles seen by software
+|-
+| style="text-align:left" | FSGNJ, FMIN/FMAX, FEQ/FLT/FLE, FCLASS || 1 || 3
+|-
+| style="text-align:left" | FCVT.W.S, FCVT.WU.S || 2 ||
+|-
+| style="text-align:left" | FCVT.S.W, FCVT.S.WU || 3 ||
+|-
+| style="text-align:left" | FADD, FSUB, FMUL || 6 || 8
+|-
+| style="text-align:left" | FMADD, FMSUB, FNMSUB, FNMADD || 6 || 9
+|-
+| style="text-align:left" | FDIV, FSQRT || 27 || 29
+|}
+
+=== Integration in the core ===
+
+The changes to Hazard3 itself are kept small and upstream-friendly; with <code>EXTENSION_ZFINX = 0</code> the core is unchanged.
+
+* '''Decode''' (<code>hazard3_decode.v</code>): the Zfinx opcodes are decoded in a block of their own. The rounding mode field is resolved against <code>frm</code>, and reserved rounding modes raise an illegal instruction exception. Single-operand instructions (sqrt, conversions, classify) report no second source register, so they don't cause false pipeline hazards.
+* '''Issue''' (<code>hazard3_core.v</code>): issued from X like the multiplier; killed when a trap is about to be taken; X stalls until the result is valid.
+* '''Three operands with two read ports.''' The fused multiply-add instructions (<code>fmadd.s</code> etc.) read three registers, but Hazard3's register file has two read ports. These instructions spend one extra cycle in X: in the first cycle rs2 is saved and the second read port, including its bypass selection, is pointed at rs3; in the second cycle the operation is issued with rs1, the saved rs2 and rs3. The load-use hazard check covers rs3 too.
+* '''CSRs''' (<code>hazard3_csr.v</code>): <code>fflags</code>, <code>frm</code> and <code>fcsr</code>. As Zfinx requires, <code>mstatus.FS</code> is read-only zero and <code>misa.F</code> is clear. Exception flags accrue when the instruction leaves X, with the same conditions as a CSR write, so an instruction squashed by a trap or a breakpoint sets no flags.
+* '''Interrupts''' restart an FP operation that is in progress, as they do for multiply/divide.
+
+== Verification ==
+
+Floating point is easy to get almost right. Most of the effort in this project went into checking it.
+
+=== Unit level ===
+
+A Verilator testbench (<code>verif/fpu</code>) drives the FPU alone and compares every result '''and every exception flag bit''' with [http://www.jhauser.us/arithmetic/SoftFloat.html Berkeley SoftFloat 3] in its RISC-V configuration:
+
+* '''TestFloat's corner case generator''' at level 2 for every operation except FMA (level 1, as level 2 would be billions of vectors), in all five rounding modes: about 200 million vectors.
+* '''Random vectors biased towards hard cases''': subnormals, NaN payloads, cancellation, results right at the underflow and overflow boundaries, integer conversion limits, and random kills of operations in progress.
+* '''Mutation checks''': deliberately broken rounding, and a dropped sticky bit, are caught by the tests. A test that can't catch a known bug isn't worth much.
+
+=== Core level ===
+
+Two new test programs run in Hazard3's own simulation test suite, alongside its existing regression tests:
+
+* <code>zfinx_golden.c</code>: 3000 SoftFloat-generated vectors across all instructions and rounding modes, executed by the core.
+* <code>zfinx_pipeline.c</code>: the pipeline corner cases: rs3 bypass and load-use paths, misaligned (compressed-boundary) FP instructions, static and dynamic rounding, fcsr access, illegal encodings, FP instructions squashed by traps and by breakpoints, and operations killed by interrupts.
+
+=== On the board ===
+
+The bitstream contains a self-test program (<code>sw/fpu_selftest</code>) that starts as soon as the FPGA is configured. It runs 1000 vectors through the real hardware, checks them against expected results, and measures the latencies:
+
+<pre>
+1000 vectors, 0 mismatches: PASS
+</pre>
+
+The measured latencies match the simulation exactly.
+
+== Resources and timing ==
+
+Lattice LFE5U-25F, Yosys and nextpnr-ecp5:
+
+{| class="wikitable" style="text-align:center"
+! Resource !! Without FPU !! With Zfinx FPU !! Available
+|-
+| style="text-align:left" | Logic (LUT4) || 6402 (26%) || 9864 (41%) || 24288
+|-
+| style="text-align:left" | Flip-flops || 1751 (7%) || 2436 (10%) || 24288
+|-
+| style="text-align:left" | Block RAM (DP16KD) || 32 || 32 || 56
+|-
+| style="text-align:left" | Multipliers (MULT18X18D) || 3 || 7 || 28
+|-
+| style="text-align:left" | Fmax (target 35 MHz) || 37-42 MHz || 36.2 MHz ||
+|}
+
+The FPU adds about 3500 LUTs, roughly half again the size of the core. The 32 block RAMs are the 64 kB SRAM.
+
+The clock is 35 MHz. The core alone was already limited to about 37-42 MHz on this speed grade (-6) before the FPU was added, so the 40-50 MHz used on other ECP5 boards doesn't close timing here. The FPU on its own reaches 38.8 MHz; its slowest path is the special-case logic in the unpack stage.
+
+With 59% of the logic still free there's room for more: a second Hazard3 core is being considered.
+
+== Benchmarks ==
+
+All on the board at 35 MHz, built with GCC 15.3. Each benchmark checks its own results.
+
+{| class="wikitable"
+! Benchmark !! Result !! Per MHz
+|-
+| Whetstone (single precision), with FPU || 15.67 MWIPS || 0.448 MWIPS/MHz
+|-
+| Whetstone (single precision), soft-float || 1.99 MWIPS || 0.057 MWIPS/MHz
+|-
+| Dhrystone 2.x || 34.94 DMIPS || 0.998 DMIPS/MHz
+|-
+| CoreMark 1.0 || 112.29 || 3.208 CoreMark/MHz
+|}
+
+* '''Whetstone''' is the classic Curnow & Wichmann benchmark, here in single precision since the FPU is FP32. The same source is built twice, with and without Zfinx, and both run on the same bitstream, so the 7.9× difference is purely the FPU. The toolchain's math library is soft-float only, so the benchmark has its own sin/cos/atan/exp/log/sqrt (within 2 ulp, <code>sqrt</code> is the <code>fsqrt.s</code> instruction), compiled for each variant. Built without fused multiply-add contraction, all three builds (FPU, soft-float and a run on the PC) give bit-identical results, which the program checks. Published Whetstone figures are usually double precision and use the system's libm, so compare with care.
+* '''Dhrystone''' and '''CoreMark''' are integer benchmarks; the FPU doesn't affect them. They are included to show the core's integer performance on this build. Hazard3's own README quotes 4.15 CoreMark/MHz for its RP2350 configuration, which also has the bit manipulation extensions and faster multiply options.
+
+== Hardware ==
+
+[[File:ColorLight 5A-75B Top View.jpg|thumb|The Colorlight 5A-75B, the board family the i5 module comes from]]
+The Colorlight i5 is a small module with an ECP5 25F, SDRAM, SPI flash and Ethernet PHYs, originally made for LED display controllers. It sits on an extension board that also has an STM32 running '''DAPLink''' firmware. A single USB cable gives:
+
+* '''JTAG''' (CMSIS-DAP) to the ECP5: used both to load bitstreams (openFPGALoader) and to debug the RISC-V core (OpenOCD)
+* the '''UART''' as a USB serial port (<code>/dev/ttyACM0</code> on Linux), 115200 baud
+
+The Hazard3 debug module is reached through the ECP5's own JTAG port (the <code>JTAGG</code> primitive, using the ER1/ER2 user instructions), so no extra pins or cables are needed for debugging.
+
+== Building and running ==
+
+The tools are all available as Debian packages (<code>yosys</code>, <code>nextpnr-ecp5</code>, <code>fpga-trellis</code>, <code>verilator</code>, <code>openfpgaloader</code>, <code>openocd</code>, <code>gcc-riscv64-unknown-elf</code>, <code>picolibc-riscv64-unknown-elf</code>).
+
+<syntaxhighlight lang="bash">
+git clone --recurse-submodules https://github.com/currentmakers/hazard3_fpu.git
+cd hazard3_fpu
+
+make -C fpga/colorlight_i5 bit prog     # build the bitstream (about 1.5 min) and load it
+make -C fpga/colorlight_i5 flash        # or write it to SPI flash
+
+picocom -b 115200 /dev/ttyACM0          # UART console
+
+make -C sw/hello load                   # load and start a program over JTAG
+make -C sw/benchmark run                # run all benchmarks, about 1.5 min
+</syntaxhighlight>
+
+=== Boot program in the bitstream ===
+
+The SRAM's initial contents are part of the bitstream, so a program runs from reset as soon as the FPGA is configured, without a debugger attached. By default that's the FPU self-test; <code>make bit BOOT_APP=hello</code> picks another program.
+
+Rebuilding the whole FPGA for every software change would be slow, so synthesis always uses the same random placeholder for the SRAM contents. After place and route, <code>ecpbram</code> finds the placeholder in the routed design and swaps in the real program. A software change becomes a new bitstream in about a second.
+
+=== Software ===
+
+Programs are bare metal, linked to run from SRAM at address 0 (trap vector at 0x0, reset at 0x40), with a small start-up file, linker script, UART driver and printf in <code>sw/common</code>, and picolibc for the C library. <code>make load</code> loads a program over JTAG with OpenOCD and starts it; <code>make run</code> does the same and shows the UART output until the program finishes.
+
+=== Debugging ===
+
+OpenOCD connects to the core over the DAPLink and runs a GDB server on port 3333. Halt, resume, single-step, register and memory access, and software breakpoints all work (all code is in RAM, so software breakpoints are enough). Connect with a RISC-V capable GDB, for example Debian's <code>gdb-multiarch</code>:
+
+<syntaxhighlight lang="bash">
+openocd -f fpga/colorlight_i5/openocd-colorlight-i5.cfg
+gdb-multiarch sw/hello/build/hello.elf -ex "target extended-remote :3333"
+</syntaxhighlight>
+
+With Zfinx, float variables live in the integer registers, so GDB shows them as integers; <code>p/f $a0</code> shows a register as a float. The current build has no hardware breakpoints and no system bus access (memory can only be read while the core is halted), and loading over JTAG is slow, about 3 kB/s.
+
+== Simulation ==
+
+The whole SoC can be simulated with Verilator (<code>make -C sim/soc run</code>), which runs a program and decodes the UART output, so software can be tried without the board. <code>sim/hazard3_tests</code> runs Hazard3's own regression tests, including the new Zfinx tests.
+
+== Status ==
+
+{| class="wikitable"
+! Part !! Status
+|-
+| FPU (all RV32F computational instructions as Zfinx) || Done, verified against SoftFloat
+|-
+| Core integration || Done, passes Hazard3's regression and the new Zfinx tests
+|-
+| Colorlight i5 build, 35 MHz || Done, tested on hardware
+|-
+| Benchmarks (Whetstone, Dhrystone, CoreMark) || Done
+|-
+| Debugging with GDB || OpenOCD works; GDB session not yet tested
+|-
+| Second core || Under consideration
+|}
+
+== Licence ==
+
+Hazard3 and the FPU are Apache-2.0. The verification uses Berkeley SoftFloat 3 and TestFloat 3 (BSD-3-Clause); CoreMark is EEMBC's (Apache-2.0).
+
+== Links ==
+
+* [https://github.com/currentmakers/hazard3_fpu hazard3_fpu project repository]
+* [https://github.com/Wren6991/Hazard3 Hazard3] by Luke Wren
+* [https://github.com/riscv/riscv-isa-manual RISC-V ISA manual] (Zfinx is in the unprivileged specification)
+* [http://www.jhauser.us/arithmetic/SoftFloat.html Berkeley SoftFloat] and [http://www.jhauser.us/arithmetic/TestFloat.html TestFloat]
+* [[FPGA]] and [[RISC-V]] on this wiki

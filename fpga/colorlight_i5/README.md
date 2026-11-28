@@ -41,11 +41,11 @@ place a carry chain in this design.
 
 | Resource          | Without FPU | With Zfinx FPU | Available |
 |-------------------|-------------|----------------|-----------|
-| Logic (LUT4/comb) | 6402 (26%)  | 9961 (41%)     | 24288     |
+| Logic (LUT4/comb) | 6402 (26%)  | 9864 (41%)     | 24288     |
 | Flip-flops        | 1751 (7%)   | 2436 (10%)     | 24288     |
 | EBR (DP16KD)      | 32          | 32             | 56        |
 | MULT18X18D        | 3           | 7              | 28        |
-| Fmax (35 MHz target) | 37-42 MHz | 37.5 MHz (seed 1) |        |
+| Fmax (35 MHz target) | 37-42 MHz | 36.2 MHz (seed 1) |        |
 
 ## Tested hardware
 

@@ -39,9 +39,6 @@ example_soc #(
 	// Placeholder contents (random, fixed seed); the Makefile replaces them
 	// with the boot program in the routed design using ecpbram.
 	.SRAM_PRELOAD        ("sram_random.hex"),
-	// Placeholder contents (random, fixed seed); the Makefile replaces them
-	// with the boot program in the routed design using ecpbram.
-	.SRAM_PRELOAD        ("sram_random.hex"),
 	.CLK_MHZ             (35),
 
 	// RV32IMAC + Zicsr + Zifencei + Zfinx (single-precision FPU)

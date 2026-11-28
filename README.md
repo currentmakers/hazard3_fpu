@@ -15,6 +15,7 @@ everything else in this repo references Hazard3 files in place.
 | `verif/fpu/`           | FPU unit testbench vs SoftFloat; `make test`, `make testfloat` |
 | `verif/zfinx/`         | Golden-vector generator for the core-level Zfinx tests        |
 | `third_party/`         | Berkeley SoftFloat 3 / TestFloat 3 (BSD-3) submodules         |
+| `doc/wiki/`            | Source of the [Stm32World wiki page](https://stm32world.com/wiki/Hazard3_%2B_FPU_on_FPGA); `push.py` uploads it |
 
 Toolchain: Debian `gcc-riscv64-unknown-elf` (builds RV32 with
 `-march=rv32... -mabi=ilp32`), picolibc, Yosys, nextpnr-ecp5, Verilator,
