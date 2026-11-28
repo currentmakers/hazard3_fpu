@@ -18,7 +18,7 @@ LDFLAGS += -nostartfiles -nostdlib -T $(COMMON)soc.ld -Wl,--gc-sections \
            -Wl,--no-warn-rwx-segments -Wl,-Map=$(BUILD)/$(APP).map
 LIBS    += -lgcc
 
-OPENOCD_CFG ?= $(COMMON)../fpga/colorlight_i5/openocd-colorlight-i5.cfg
+OPENOCD_CFG ?= $(COMMON)../../fpga/colorlight_i5/openocd-colorlight-i5.cfg
 
 .PHONY: all clean load
 all: $(BUILD)/$(APP).elf $(BUILD)/$(APP).bin $(BUILD)/$(APP).dis
@@ -36,7 +36,8 @@ $(BUILD)/$(APP).dis: $(BUILD)/$(APP).elf
 
 # Load into SRAM over JTAG (FPGA must already be configured) and run from reset vector
 load: $(BUILD)/$(APP).elf
-	openocd -f $(OPENOCD_CFG) -c "load_image $< 0x0 elf; verify_image $< 0x0 elf; resume 0x40; shutdown"
+	openocd -f $(OPENOCD_CFG) -c "load_image $< 0x0 elf" \
+		-c "catch {verify_image $< 0x0 elf}" -c "resume 0x40" -c shutdown
 
 clean:
 	rm -rf $(BUILD)

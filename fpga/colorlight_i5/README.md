@@ -32,5 +32,25 @@ place a carry chain in this design.
 | MULT18X18D        | 3           | 7              | 28        |
 | Fmax (35 MHz target) | 37-42 MHz | 37.5 MHz (seed 1) |        |
 
-The UART pins (J17 tx, H18 rx) come from the LiteX colorlight_i5 board
-definition; check them against your extension board revision.
+## Tested hardware
+
+Verified on an i5 module on the extension board with the STM32 DAPLink
+probe (USB 0d28:0204 "DAPLink CMSIS-DAP"). The one USB cable provides:
+
+- JTAG to the ECP5: `make prog` (openFPGALoader) and Hazard3 debug through
+  OpenOCD (`openocd-colorlight-i5.cfg`, or `make load` in `sw/<app>`)
+- the UART as `/dev/ttyACM0`, 115200 baud, both directions (J17 tx, H18 rx)
+
+The user needs access to the probe's hidraw and ttyACM devices (on Debian,
+membership of `plugdev` was enough).
+
+Bring-up sequence:
+
+    make -C fpga/colorlight_i5 prog        # bitstream to SRAM (lost at power-off)
+    make -C sw/fpu_selftest load           # program to SRAM over JTAG, run from 0x40
+    picocom -b 115200 /dev/ttyACM0         # or start this first to see all output
+
+On hardware `fpu_selftest` reports `1000 vectors, 0 mismatches: PASS` with
+the same latencies as in simulation (fadd/fmul 8, fmadd 9, fdiv/fsqrt 29,
+fmin/feq 3 cycles). OpenOCD's "No working memory available" message during
+`verify_image` is harmless (it falls back to reading the memory back).

@@ -1,6 +1,6 @@
 # Colorlight i5 (v7.0) pin constraints.
-# Pins taken from the LiteX colorlight_i5 board definition -- verify against
-# your module revision / extension board before trusting the UART pins.
+# Pins taken from the LiteX colorlight_i5 board definition; clock and UART
+# verified on hardware with the STM32 (DAPLink) extension board (LED not yet).
 
 LOCATE COMP "clk_osc" SITE "P3";
 IOBUF  PORT "clk_osc" IO_TYPE=LVCMOS33;
