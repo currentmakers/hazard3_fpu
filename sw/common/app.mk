@@ -41,6 +41,19 @@ load: $(BUILD)/$(APP).elf
 	openocd -f $(OPENOCD_CFG) -c "load_image $< 0x0 elf" \
 		-c "catch {verify_image $< 0x0 elf}" -c "resume 0x40" -c shutdown
 
+# Load and run, showing the UART output until a line starting with "Done"
+TTY      ?= /dev/ttyACM0
+RUN_SECS ?= 120
+.PHONY: run
+run: $(BUILD)/$(APP).elf
+	@stty -F $(TTY) 115200 raw -echo
+	@timeout $(RUN_SECS) sed -u '/^Done/q' $(TTY) & \
+	 sleep 0.5; \
+	 openocd -f $(OPENOCD_CFG) -c "load_image $< 0x0 elf" \
+		-c "catch {verify_image $< 0x0 elf}" -c "resume 0x40" -c shutdown > $(BUILD)/load.log 2>&1 \
+	   || { cat $(BUILD)/load.log; kill $$!; exit 1; }; \
+	 wait
+
 clean:
 	rm -rf $(BUILD)
 

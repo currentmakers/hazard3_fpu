@@ -1,51 +1,57 @@
-# Whetstone benchmark: Hazard3 with and without the Zfinx FPU
+# Benchmarks: Hazard3 + Zfinx FPU on the Colorlight i5
 
-The classic Curnow & Wichmann Whetstone (1976), in **single precision** (the
-FPU is FP32), built from one source in two variants:
+| Directory                  | Benchmark                         | Measures                    |
+|----------------------------|-----------------------------------|-----------------------------|
+| [whetstone](whetstone/)    | Whetstone, single precision       | floating point, with and without the FPU |
+| [dhrystone](dhrystone/)    | Dhrystone 2.x                     | integer (DMIPS)             |
+| [coremark](coremark/)      | EEMBC CoreMark 1.0                | integer (CoreMark)          |
 
-| Build            | `-march`                         | float arithmetic              |
-|------------------|----------------------------------|-------------------------------|
-| `whetstone_fpu`  | `rv32imac_zicsr_zifencei_zfinx`  | FPU instructions              |
-| `whetstone_soft` | `rv32imac_zicsr_zifencei`        | libgcc soft-float calls       |
+    make          # build all
+    make run      # run all on the board, one after the other (about 1.5 min)
+    make -C coremark run      # or one of them
 
-Both run on the same bitstream (the soft build simply uses no FP instructions),
-so the difference is purely the FPU.
+`run` loads the program into SRAM over JTAG (DAPLink CMSIS-DAP), starts it
+and prints the UART output (`/dev/ttyACM0`, override with `TTY=`) until the
+program says "Done". The FPGA must be configured first:
+`make -C ../../fpga/colorlight_i5 prog` (or the bitstream in flash).
 
-    make             # build both (and the host reference)
-    make run         # load + run both over JTAG, print the UART output
-    make run-fpu     # or one of them
-    make host        # run on the build machine
+## Results (2026-11-28, 35 MHz)
 
-`make run*` needs the FPGA configured (`make -C ../../fpga/colorlight_i5 prog`,
-or the bitstream in flash) and the DAPLink UART on `/dev/ttyACM0` (`TTY=`).
+Core configuration as in `fpga/colorlight_i5`: RV32IMAC + Zicsr + Zifencei +
+Zfinx, fast multiplier (`MUL_FAST`), branch predictor, 64 kB SRAM on the
+example SoC's single AHB port. GCC 15.3 (Debian riscv64-unknown-elf).
 
-## Results (Colorlight i5, 35 MHz, 2026-11-28)
+| Benchmark                    | Result          | Per MHz            |
+|------------------------------|-----------------|--------------------|
+| Whetstone, with FPU          | 15.67 MWIPS     | 0.448 MWIPS/MHz    |
+| Whetstone, soft-float        | 1.99 MWIPS      | 0.057 MWIPS/MHz    |
+| Dhrystone                    | 34.94 DMIPS     | 0.998 DMIPS/MHz    |
+| CoreMark                     | 112.29          | 3.208 CoreMark/MHz |
 
-| Build            | MWIPS  | MWIPS/MHz |
-|------------------|--------|-----------|
-| `whetstone_fpu`  | 15.67  | 0.448     |
-| `whetstone_soft` | 1.99   | 0.057     |
-
-The FPU makes Whetstone **7.9x** faster. Time share per module (FPU / soft):
-trig functions 32% / 35%, procedure calls 32% / 29%, standard functions
-23% / 27%, array as parameter 6% / 7%, array references 7% / 1%.
+Dhrystone and CoreMark are integer benchmarks; the FPU does not affect them.
+For comparison, Hazard3's README quotes 4.15 CoreMark/MHz for the RP2350
+configuration, which additionally has Zba/Zbb/Zbs/Zbkb and faster multiply
+options and was measured in simulation. Building CoreMark here without the C
+extension gives 3.08 CoreMark/MHz (more code, 62 of 64 kB), so compressed code
+is not the cause of the difference.
 
 ## Notes
 
-- **Own math functions.** The toolchain's libm is soft-float only; linking it
-  would run sin/cos/atan/exp/log on soft-float even in the FPU build. So
-  `fmath.c` implements them in plain C and gets compiled with each variant's
-  `-march` (accuracy within 2 ulp; `f_sqrt` is `fsqrt.s` with the FPU and a
-  correctly rounded integer routine without). Published Whetstone figures for
-  other systems use their libm, so compare those with care.
-- **Single precision.** Standard Whetstone is double precision; published
-  MWIPS figures are usually DP and not directly comparable.
-- **Result check.** Built with `-ffp-contract=off` (no fused multiply-add), all
-  operations are correctly rounded IEEE single precision in a fixed order, so
-  the FPU build, the soft build and the host build give bit-identical module
-  results. The host build generates `build/whetstone_ref.h` and both target
-  builds check against it (the "PASS" line). Allowing contraction would let GCC
-  use `fmadd.s` and change the low bits of the results.
-- Modules 1, 5 and 10 have zero iterations in the original and are left out.
-  The procedure-call module's functions are `noinline`, as intended.
-- Timing uses `mcycle`; the run length adapts to at least 2 seconds.
+- **Sources.** CoreMark and Dhrystone are used unmodified from the Hazard3
+  submodule (`hazard3/test/sim/coremark`, `hazard3/test/sim/dhrystone`); only
+  the board ports live here. CoreMark: Apache-2.0 (EEMBC), port adapted from
+  Hazard3's `barebones` port. Dhrystone: the riscv-tests copy (BSD).
+- **CoreMark** runs a fixed 2000 iterations (`make ITERATIONS=n`), about
+  18 s; a valid CoreMark needs at least 10 s. The CRCs are checked by CoreMark
+  itself ("Correct operation validated").
+- **Dhrystone** follows Hazard3's flags (`-O3 -fno-inline`); `strcpy`/`strcmp`
+  are picolibc's. It times 500 runs with `mcycle` (cycle-exact, so no longer
+  run is needed). Its own output prints cycles as "Microseconds" and runs per
+  million cycles as "per Second" (that is how the riscv-tests port uses
+  `mcycle`); the summary at the end converts to real units and checks the
+  final values. 1 DMIPS = 1757 Dhrystones/s.
+- **Whetstone**: see [whetstone/README.md](whetstone/README.md).
+- Each program waits 0.3 s before printing: the DAPLink sometimes drops UART
+  data while OpenOCD is still talking to it after starting the program.
+- Shared helpers in `sw/common`: `tiny_printf.c` (printf subset with `%f`) and
+  the `run` target in `app.mk`.
