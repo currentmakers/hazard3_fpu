@@ -36,6 +36,12 @@ example_soc #(
 	// LFE5U-25F has 56 x 18 kbit EBRs (126 kB). Use 64 kB for the SRAM,
 	// leaving EBRs for the register file, caches, FPU tables etc.
 	.SRAM_DEPTH          (1 << 14),
+	// Placeholder contents (random, fixed seed); the Makefile replaces them
+	// with the boot program in the routed design using ecpbram.
+	.SRAM_PRELOAD        ("sram_random.hex"),
+	// Placeholder contents (random, fixed seed); the Makefile replaces them
+	// with the boot program in the routed design using ecpbram.
+	.SRAM_PRELOAD        ("sram_random.hex"),
 	.CLK_MHZ             (35),
 
 	// RV32IMAC + Zicsr + Zifencei + Zfinx (single-precision FPU)

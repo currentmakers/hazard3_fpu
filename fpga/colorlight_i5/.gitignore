@@ -4,3 +4,5 @@
 *.svf
 *.log
 *_synth.v
+*.hex
+*.tmp

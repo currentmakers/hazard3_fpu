@@ -23,7 +23,7 @@ OPENOCD_CFG ?= $(COMMON)../../fpga/colorlight_i5/openocd-colorlight-i5.cfg
 .PHONY: all clean load
 all: $(BUILD)/$(APP).elf $(BUILD)/$(APP).bin $(BUILD)/$(APP).dis
 
-$(BUILD)/$(APP).elf: $(COMMON)crt0.S $(SRCS) $(wildcard $(COMMON)*.h) $(COMMON)soc.ld
+$(BUILD)/$(APP).elf: $(COMMON)crt0.S $(SRCS) $(wildcard $(COMMON)*.h) $(COMMON)soc.ld $(COMMON)app.mk Makefile
 	@mkdir -p $(BUILD)
 	$(CROSS_PREFIX)gcc $(CFLAGS) $(LDFLAGS) $(COMMON)crt0.S $(SRCS) $(LIBS) -o $@
 	$(CROSS_PREFIX)size $@
